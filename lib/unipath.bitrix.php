@@ -49,7 +49,7 @@ function _uni_bx_cache_on(&$tree, $lv) {
 				
 				// загружаем данные в bxcache_off
 				$tree[$i]['data'] = $cache->GetVars();
-				$tree[$i]['metadata'][0] = gettype($result['data']);
+				$tree[$i]['metadata'][0] = gettype($tree[$i]['data']);
 				
 				// сообщим, что надо перепрыгнуть на него
 				$result['metadata']['jump_to_lv'] = $i+1; 
@@ -60,6 +60,7 @@ function _uni_bx_cache_on(&$tree, $lv) {
 				$tree[$i]['metadata'] = array('null'); // заполняем метаданные пропущенных узлов
 		}
 	}
+
 	return $result;
 }
 
@@ -92,6 +93,42 @@ function _uni_bx_cache_off($tree, $lv = 0) {
 	}
 
 	return $tree[$lv-1];
+}
+
+function _uni_bxcache_get($tree, $lv = 0)
+{
+	list($args, $args_types) = __uni_parseFuncArgs($tree[$lv]['name']);
+
+	// (cache_id)
+	$arg1 = explode('/', str_replace('\\', '/', $args[0]));
+	if (count($arg1) > 1) {
+		$cache_id = array_pop($arg1);
+		$cache_path = implode('/', $arg1);
+	}
+	elseif (strpos($args[0], '_')) {
+		$cache_id = $args[0];
+		$cache_path = strtok($args[0], '_');
+	}
+	else {
+		$cache_id = $arg1[0];
+		$cache_path = false;
+	}
+
+	$cache = new CPHPCache();
+	$result = array('data' => null, 'metadata' => array(
+		'null',
+		'cache' => $cache,
+		'cache_id' => $cache_id,
+		'cache_path' => $cache_path
+	));
+
+	if($cache->InitCache(60*60*24*365, $cache_id, $cache_path))
+	{
+		$result['data'] = $cache->GetVars();
+		$result['metadata'][0] = gettype($result['data']);
+	}
+
+	return $result;
 }
 
 function _uni_bxsql($tree, $lv) {
@@ -134,7 +171,7 @@ function _uni_bx($tree, $lv) {
 		'metadata' => array('null', 'cursor()' => new UniPathExtension_BX()));
 }
 
-class UniPathExtension_BX extends UniPathExtension {
+class UniPathExtension_BX extends \UniPathExtension {
 
 	function evalute($tree_node) {
 		
@@ -724,5 +761,7 @@ class UniPathExtension_BX extends UniPathExtension {
 
 // для удобства
 global $bx_db;
-$GLOBALS['DB']->DoConnect();
-$bx_db = new Uni('/DB/db_Conn');
+if(isset($GLOBALS['DB'])) {
+	$GLOBALS['DB']->DoConnect();
+	$bx_db = new Uni('/DB/db_Conn');
+}
